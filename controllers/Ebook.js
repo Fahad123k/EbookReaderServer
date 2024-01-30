@@ -1,17 +1,22 @@
 import { EBook } from '../model/EBook.js';
 import mongoose from 'mongoose';
+import cloudinary from "../utils/cloudinary.js"
+import upload from '../middleware/multer.js'
+
 
 // create book
 export const createEBook = async (req, res) => {
   try {
-    const ebook = await EBook.create(req.body);
-    res.status(201).json(ebook);
+    const cloud_result=await cloudinary.uploader.upload(req.file.path);
+    console.log("cloud link ",cloud_result)
+    // const ebook = await EBook.create(req.body);
+    res.status(201).json(cloud_result);
   } catch (error) {
     res.status(500).json({ error: "Internal Server Error" });
   }
 };
 
-// get all
+// get all with search
 
 export const getEbook = async (req, res) => {
   try {
@@ -29,6 +34,9 @@ export const getEbook = async (req, res) => {
             { genre: { $regex: new RegExp(search, 'i') } },
             { language: { $regex: new RegExp(search, 'i') } },
             { publisher: { $regex: new RegExp(search, 'i') } },
+            ...(isNaN(parseInt(search, 10))
+              ? [] // Skip the filter if search is not a valid number
+              : [{ publicationYear: { $eq: parseInt(search, 10) } }]),
           ],
         }
       : {};
@@ -37,7 +45,11 @@ export const getEbook = async (req, res) => {
     const totalPage = Math.ceil(totalRecord / limit);
 
     if (page >= totalPage) {
-      return res.status(404).json({ message: 'No more data available' });
+      if (totalRecord === 0) {
+        return res.status(404).json({ message: 'No matching records found' });
+      } else {
+        return res.status(404).json({ message: 'No more data available' });
+      }
     }
 
     const ebooks = await EBook.find(query)
@@ -50,9 +62,11 @@ export const getEbook = async (req, res) => {
       eBooks: ebooks,
     });
   } catch (error) {
+    console.error('Error in getEbook:', error);
     res.status(500).json({ error: 'Internal Server Error' });
   }
 };
+
 
 
 //   get by id
